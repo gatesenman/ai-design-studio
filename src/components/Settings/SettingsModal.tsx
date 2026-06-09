@@ -355,7 +355,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       {tab === 'about' && (
         <div className="space-y-3 text-sm text-gray-300">
           <div className="text-lg font-semibold text-white">AI Design Studio</div>
-          <p className="text-gray-400">版本 0.1.0 · 跨端 AI 驱动设计桌面程序</p>
+          <p className="text-gray-400">版本 1.0.0 · 跨端 AI 驱动设计桌面程序</p>
           <p className="text-gray-400">
             类似 lovart.ai 的「左聊天 / 右自由画布」工作流：支持文生图 / 图生图、批量生成、长图分节连贯生成、Skill 工作流、品牌套件与多家国内外生图模型。
           </p>

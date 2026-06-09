@@ -1,8 +1,29 @@
-# AI Design Studio
+# AI Design Studio · v1.0.0
 
 类似 [lovart.ai](https://lovart.ai) 的 **AI 驱动设计桌面程序**，面向电商场景：左侧聊天、右侧无限画布，支持多家文生图 / 图生图模型、批量生成、电商长图分节连贯生成、以及 Skill 工作流管理。
 
 > 项目 》画布 》画板 》AI 驱动设计
+
+## ⬇️ 下载安装（v1.0.0）
+
+前往 [Releases](https://github.com/gaosichun888/ai-design-studio/releases) 下载：
+
+| 平台 | 安装包 |
+| --- | --- |
+| Windows | `AI Design Studio Setup 1.0.0.exe`（NSIS 安装程序） |
+| Linux | `AI Design Studio-1.0.0.AppImage` |
+| macOS | 从源码构建 dmg（见 [构建与打包](docs/wiki/构建与打包.md)） |
+
+## 📚 文档 / Wiki
+
+完整文档见 [`docs/wiki`](docs/wiki/Home.md)：
+[功能总览](docs/wiki/功能总览.md) ·
+[安装与使用](docs/wiki/安装与使用.md) ·
+[生图模型配置](docs/wiki/生图模型配置.md) ·
+[画布操作与快捷键](docs/wiki/画布操作与快捷键.md) ·
+[长图分节生成](docs/wiki/长图分节生成.md) ·
+[Skill 工作流](docs/wiki/Skill工作流.md) ·
+[构建与打包](docs/wiki/构建与打包.md)
 
 ## ✨ 功能
 
@@ -10,7 +31,7 @@
 - **无限自由画布**（基于 Fabric.js）：缩放（滚轮 / 工具栏）、平移（空格 + 拖拽 / 中键）、多选、拖拽、复制、图层上下移、删除、文字节点、画板模板（电商主图 800×800 / 详情页 / 海报 / Banner）。
 - **多模型文生图 / 图生图**，统一模型选择器一键切换：
   - 🌍 国外：**ChatGPT 生图 gpt-image-1**、OpenAI **DALL·E 3**、Google **Imagen 3**
-  - 🇨🇳 国内：阿里**通义万相**、字节**即梦 Seedream**、百度**文心一格**、智谱 **CogView**、腾讯**混元生图**、**MiniMax 海螺**
+  - 🇨🇳 国内：阿里**通义万相**、字节**即梦 Seedream**、百度**文心一格**、智谱 **CogView**、腾讯**混元生图**、**MiniMax 海螺**、**硅基流动 SiliconFlow**（聚合 Kolors / FLUX）
 - **批量生成**（1–20 张），结果自动在画布上网格排列。
 - **长图分节生成**：电商详情页按「标题图 → 卖点 → 细节 → 场景 → 售后」分节生成，共享 seed + 统一风格 prompt 保证各段连贯，自动垂直拼接；可框选后「导出长图」合并为一张 PNG。
 - **Skill 管理**：内置「电商主图 / 电商海报 / 电商详情页」三个工作流；支持新建 / 编辑 / 删除自定义 Skill（prompt 模板 + 变量 + 默认模型/尺寸/数量），内置 Skill 可「另存为自定义」后修改。
@@ -77,11 +98,28 @@ npm run typecheck
 | 智谱 CogView | `zhipu` | 智谱开放平台 Key |
 | 腾讯混元生图 | `tencent` | 格式 `SecretId:SecretKey` |
 | MiniMax 海螺 | `minimax` | MiniMax API Key |
+| 硅基流动 SiliconFlow | `siliconflow` | `sk-...`（OpenAI 兼容，支持 Kolors 图生图，推荐新手） |
 
 > 未配置 Key 的平台会自动回退到 Demo 占位生成，方便先体验完整流程。
+> 各家 Key 获取详见 [生图模型配置](docs/wiki/生图模型配置.md)。
 
-## ⌨️ 画布快捷操作
+## ⌨️ 画布快捷键（共 14 项）
 
-- 滚轮：缩放 / 空格 + 拖拽、中键拖拽：平移
-- Delete / Backspace：删除选中
-- 工具栏：画板、文字、复制、图层上下移、删除、缩放、适应内容、导出、长图拼接导出
+| 快捷键 | 功能 |
+| --- | --- |
+| Ctrl + Z | 撤销 |
+| Ctrl + Shift + Z / Ctrl + Y | 重做 |
+| Ctrl + C / V / X | 复制 / 粘贴 / 剪切 |
+| Ctrl + D | 创建副本 |
+| Ctrl + A | 全选 |
+| Delete / Backspace | 删除选中 |
+| 方向键 | 微移 1px（Shift 为 10px） |
+| [ / ] | 下移 / 上移一层 |
+| Ctrl + 0 | 重置缩放 100% |
+| Ctrl + 1 | 适应内容 |
+| Ctrl + = / Ctrl + - | 放大 / 缩小 |
+| F | 缩放到选区 |
+| 空格 + 拖拽 | 平移画布 |
+| Esc | 取消选择 / 关闭菜单 |
+
+详见 [画布操作与快捷键](docs/wiki/画布操作与快捷键.md)。
