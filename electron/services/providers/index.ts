@@ -8,6 +8,7 @@ import { generateSeedream } from './volcengine'
 import { generateMinimax } from './minimax'
 import { generateYige } from './baidu'
 import { generateHunyuan } from './tencent'
+import { generateSiliconflow } from './siliconflow'
 
 export async function runGenerate(
   req: GenerateRequest,
@@ -47,6 +48,9 @@ export async function runGenerate(
       break
     case 'tencent-hunyuan':
       images = await generateHunyuan(req, key)
+      break
+    case 'siliconflow':
+      images = await generateSiliconflow(req, key)
       break
     default:
       throw new Error(`暂不支持的生图服务: ${req.providerId}`)

@@ -150,6 +150,33 @@ export const PROVIDERS: ProviderInfo[] = [
       },
     ],
   },
+  {
+    id: 'siliconflow',
+    name: '硅基流动 SiliconFlow',
+    region: 'china',
+    apiKeyField: 'siliconflow',
+    docsUrl: 'https://cloud.siliconflow.cn/account/ak',
+    models: [
+      {
+        id: 'Kwai-Kolors/Kolors',
+        label: 'Kolors (可图)',
+        sizes: ['1024x1024', '768x1024', '1024x768', '720x1280', '1280x720'],
+        supportsImageToImage: true,
+      },
+      {
+        id: 'black-forest-labs/FLUX.1-schnell',
+        label: 'FLUX.1 schnell',
+        sizes: ['1024x1024', '768x1024', '1024x768', '720x1280', '1280x720'],
+        supportsImageToImage: false,
+      },
+      {
+        id: 'black-forest-labs/FLUX.1-dev',
+        label: 'FLUX.1 dev',
+        sizes: ['1024x1024', '768x1024', '1024x768', '720x1280', '1280x720'],
+        supportsImageToImage: false,
+      },
+    ],
+  },
 ]
 
 export function getProvider(id: string): ProviderInfo | undefined {

@@ -28,6 +28,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      // ESM (.mjs) preload scripts only load when the renderer is not sandboxed.
+      sandbox: false,
     },
   })
 

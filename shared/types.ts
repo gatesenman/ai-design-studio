@@ -10,6 +10,7 @@ export type ProviderId =
   | 'zhipu-cogview'
   | 'tencent-hunyuan'
   | 'minimax'
+  | 'siliconflow'
 
 export type GenerationMode = 'text-to-image' | 'image-to-image'
 
