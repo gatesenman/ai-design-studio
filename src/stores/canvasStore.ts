@@ -8,26 +8,75 @@ interface PlaceOptions {
   label?: string
 }
 
+export type AlignType = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom'
+export type DistributeAxis = 'h' | 'v'
+
+interface ExportPrefs {
+  showGrid: boolean
+  snapEnabled: boolean
+  canvasBg: string
+  exportFormat: 'png' | 'jpeg'
+  exportQuality: number
+  exportScale: number
+  longImageGap: number
+}
+
 interface CanvasState {
   canvas: fabric.Canvas | null
   zoom: number
   hasSelection: boolean
+  selectionCount: number
   cursor: { x: number; y: number }
+  // live preferences (mirrored from settings)
+  showGrid: boolean
+  snapEnabled: boolean
+  canvasBg: string
+  exportFormat: 'png' | 'jpeg'
+  exportQuality: number
+  exportScale: number
+  longImageGap: number
+  // history
+  canUndo: boolean
+  canRedo: boolean
+  _undo: string[]
+  _redo: string[]
+  _histLock: boolean
+  _clipboard: fabric.FabricObject[] | null
   setCanvas: (c: fabric.Canvas | null) => void
   refreshSelection: () => void
+  applyPreferences: (p: Partial<ExportPrefs>) => void
+  setShowGrid: (v: boolean) => void
+  setSnapEnabled: (v: boolean) => void
+  setCanvasBg: (c: string) => void
   addImageFromUrl: (url: string, opts?: PlaceOptions) => Promise<fabric.FabricImage | null>
   addImagesGrid: (urls: string[], cols?: number) => Promise<void>
   addLongImageColumn: (urls: string[], titles?: string[]) => Promise<void>
+  addImageFromFile: (file: File) => Promise<void>
+  importImageFiles: (files: FileList | File[]) => Promise<void>
   addArtboard: (w: number, h: number, label: string) => void
   addText: (text: string) => void
   deleteSelected: () => void
   duplicateSelected: () => Promise<void>
+  copySelected: () => Promise<void>
+  paste: () => Promise<void>
+  nudge: (dx: number, dy: number) => void
+  selectAll: () => void
+  deselect: () => void
   bringForward: () => void
   sendBackward: () => void
+  bringToFront: () => void
+  sendToBack: () => void
+  alignSelected: (type: AlignType) => void
+  distributeSelected: (axis: DistributeAxis) => void
+  editSelectedWithAI: () => void
+  pushHistory: () => void
+  undo: () => void
+  redo: () => void
   zoomBy: (factor: number) => void
   setZoom: (z: number) => void
   resetView: () => void
   fitToContent: () => void
+  zoomToSelection: () => void
   exportSelected: () => Promise<void>
   exportLongFromSelection: () => Promise<void>
 }
@@ -38,15 +87,68 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   canvas: null,
   zoom: 1,
   hasSelection: false,
+  selectionCount: 0,
   cursor: { x: 80, y: 80 },
+  showGrid: true,
+  snapEnabled: true,
+  canvasBg: '#1a1a1e',
+  exportFormat: 'png',
+  exportQuality: 0.92,
+  exportScale: 2,
+  longImageGap: 0,
+  canUndo: false,
+  canRedo: false,
+  _undo: [],
+  _redo: [],
+  _histLock: false,
+  _clipboard: null,
 
   setCanvas(c) {
-    set({ canvas: c })
+    set({ canvas: c, _undo: [], _redo: [], canUndo: false, canRedo: false })
+    if (c) {
+      c.backgroundColor = get().canvasBg
+      c.requestRenderAll()
+    }
   },
 
   refreshSelection() {
     const c = get().canvas
-    set({ hasSelection: !!c && c.getActiveObjects().length > 0 })
+    const count = c ? c.getActiveObjects().length : 0
+    set({ hasSelection: count > 0, selectionCount: count })
+  },
+
+  applyPreferences(p) {
+    const patch: Partial<ExportPrefs> = {}
+    if (p.showGrid !== undefined) patch.showGrid = p.showGrid
+    if (p.snapEnabled !== undefined) patch.snapEnabled = p.snapEnabled
+    if (p.canvasBg !== undefined) patch.canvasBg = p.canvasBg
+    if (p.exportFormat !== undefined) patch.exportFormat = p.exportFormat
+    if (p.exportQuality !== undefined) patch.exportQuality = p.exportQuality
+    if (p.exportScale !== undefined) patch.exportScale = p.exportScale
+    if (p.longImageGap !== undefined) patch.longImageGap = p.longImageGap
+    set(patch)
+    const c = get().canvas
+    if (c && patch.canvasBg) {
+      c.backgroundColor = patch.canvasBg
+      c.requestRenderAll()
+    }
+  },
+
+  setShowGrid(v) {
+    set({ showGrid: v })
+  },
+
+  setSnapEnabled(v) {
+    set({ snapEnabled: v })
+  },
+
+  setCanvasBg(color) {
+    set({ canvasBg: color })
+    const c = get().canvas
+    if (c) {
+      c.backgroundColor = color
+      c.requestRenderAll()
+    }
   },
 
   async addImageFromUrl(url, opts) {
@@ -121,10 +223,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         })
         c.add(label)
       }
-      y += img.getScaledHeight() // sections touch edge-to-edge for a seamless long image
+      // sections touch edge-to-edge for a seamless long image (gap configurable)
+      y += img.getScaledHeight() + get().longImageGap
     }
     c.requestRenderAll()
     set({ cursor: { x: start.x + targetWidth + 220, y: start.y } })
+  },
+
+  async addImageFromFile(file) {
+    if (!file.type.startsWith('image/')) return
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    await get().addImageFromUrl(dataUrl, { label: file.name })
+  },
+
+  async importImageFiles(files) {
+    const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    for (const f of list) {
+      await get().addImageFromFile(f)
+    }
   },
 
   addArtboard(w, h, label) {
@@ -186,13 +307,77 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   async duplicateSelected() {
     const c = get().canvas
     if (!c) return
-    const active = c.getActiveObject()
-    if (!active) return
-    const cloned = await active.clone()
-    cloned.set({ left: (active.left || 0) + 24, top: (active.top || 0) + 24 })
-    c.add(cloned)
-    c.setActiveObject(cloned)
+    const objs = c.getActiveObjects()
+    if (!objs.length) return
+    const clones = await Promise.all(objs.map((o) => o.clone()))
+    c.discardActiveObject()
+    clones.forEach((o) => {
+      o.set({ left: (o.left || 0) + 24, top: (o.top || 0) + 24 })
+      c.add(o)
+    })
+    if (clones.length === 1) c.setActiveObject(clones[0])
+    else c.setActiveObject(new fabric.ActiveSelection(clones, { canvas: c }))
     c.requestRenderAll()
+    get().refreshSelection()
+  },
+
+  async copySelected() {
+    const c = get().canvas
+    if (!c) return
+    const objs = c.getActiveObjects()
+    if (!objs.length) return
+    const clones = await Promise.all(objs.map((o) => o.clone()))
+    set({ _clipboard: clones })
+  },
+
+  async paste() {
+    const c = get().canvas
+    const clip = get()._clipboard
+    if (!c || !clip || !clip.length) return
+    const clones = await Promise.all(clip.map((o) => o.clone()))
+    c.discardActiveObject()
+    clones.forEach((o) => {
+      o.set({ left: (o.left || 0) + 24, top: (o.top || 0) + 24 })
+      c.add(o)
+    })
+    if (clones.length === 1) c.setActiveObject(clones[0])
+    else c.setActiveObject(new fabric.ActiveSelection(clones, { canvas: c }))
+    c.requestRenderAll()
+    get().refreshSelection()
+  },
+
+  nudge(dx, dy) {
+    const c = get().canvas
+    if (!c) return
+    const objs = c.getActiveObjects()
+    if (!objs.length) return
+    const active = c.getActiveObject()
+    if (active) {
+      active.set({ left: (active.left || 0) + dx, top: (active.top || 0) + dy })
+      active.setCoords()
+    }
+    c.requestRenderAll()
+    get().pushHistory()
+  },
+
+  selectAll() {
+    const c = get().canvas
+    if (!c) return
+    c.discardActiveObject()
+    const objs = c.getObjects()
+    if (!objs.length) return
+    if (objs.length === 1) c.setActiveObject(objs[0])
+    else c.setActiveObject(new fabric.ActiveSelection(objs, { canvas: c }))
+    c.requestRenderAll()
+    get().refreshSelection()
+  },
+
+  deselect() {
+    const c = get().canvas
+    if (!c) return
+    c.discardActiveObject()
+    c.requestRenderAll()
+    get().refreshSelection()
   },
 
   bringForward() {
@@ -200,6 +385,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (!c) return
     c.getActiveObjects().forEach((o) => c.bringObjectForward(o))
     c.requestRenderAll()
+    get().pushHistory()
   },
 
   sendBackward() {
@@ -207,6 +393,138 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (!c) return
     c.getActiveObjects().forEach((o) => c.sendObjectBackwards(o))
     c.requestRenderAll()
+    get().pushHistory()
+  },
+
+  bringToFront() {
+    const c = get().canvas
+    if (!c) return
+    c.getActiveObjects().forEach((o) => c.bringObjectToFront(o))
+    c.requestRenderAll()
+    get().pushHistory()
+  },
+
+  sendToBack() {
+    const c = get().canvas
+    if (!c) return
+    c.getActiveObjects().forEach((o) => c.sendObjectToBack(o))
+    c.requestRenderAll()
+    get().pushHistory()
+  },
+
+  alignSelected(type) {
+    const c = get().canvas
+    if (!c) return
+    const objs = [...c.getActiveObjects()]
+    if (objs.length < 2) return
+    c.discardActiveObject()
+    const rects = objs.map((o) => ({ o, r: o.getBoundingRect() }))
+    const minLeft = Math.min(...rects.map((x) => x.r.left))
+    const maxRight = Math.max(...rects.map((x) => x.r.left + x.r.width))
+    const minTop = Math.min(...rects.map((x) => x.r.top))
+    const maxBottom = Math.max(...rects.map((x) => x.r.top + x.r.height))
+    const cx = (minLeft + maxRight) / 2
+    const cy = (minTop + maxBottom) / 2
+    rects.forEach(({ o, r }) => {
+      let dx = 0
+      let dy = 0
+      if (type === 'left') dx = minLeft - r.left
+      else if (type === 'hcenter') dx = cx - (r.left + r.width / 2)
+      else if (type === 'right') dx = maxRight - (r.left + r.width)
+      else if (type === 'top') dy = minTop - r.top
+      else if (type === 'vcenter') dy = cy - (r.top + r.height / 2)
+      else if (type === 'bottom') dy = maxBottom - (r.top + r.height)
+      o.set({ left: (o.left || 0) + dx, top: (o.top || 0) + dy })
+      o.setCoords()
+    })
+    c.setActiveObject(new fabric.ActiveSelection(objs, { canvas: c }))
+    c.requestRenderAll()
+    get().pushHistory()
+  },
+
+  distributeSelected(axis) {
+    const c = get().canvas
+    if (!c) return
+    const objs = [...c.getActiveObjects()]
+    if (objs.length < 3) return
+    c.discardActiveObject()
+    const items = objs.map((o) => ({ o, r: o.getBoundingRect() }))
+    if (axis === 'h') {
+      items.sort((a, b) => a.r.left + a.r.width / 2 - (b.r.left + b.r.width / 2))
+      const first = items[0].r.left + items[0].r.width / 2
+      const last = items[items.length - 1].r.left + items[items.length - 1].r.width / 2
+      const step = (last - first) / (items.length - 1)
+      items.forEach((it, i) => {
+        const target = first + step * i
+        const cur = it.r.left + it.r.width / 2
+        it.o.set({ left: (it.o.left || 0) + (target - cur) })
+        it.o.setCoords()
+      })
+    } else {
+      items.sort((a, b) => a.r.top + a.r.height / 2 - (b.r.top + b.r.height / 2))
+      const first = items[0].r.top + items[0].r.height / 2
+      const last = items[items.length - 1].r.top + items[items.length - 1].r.height / 2
+      const step = (last - first) / (items.length - 1)
+      items.forEach((it, i) => {
+        const target = first + step * i
+        const cur = it.r.top + it.r.height / 2
+        it.o.set({ top: (it.o.top || 0) + (target - cur) })
+        it.o.setCoords()
+      })
+    }
+    c.setActiveObject(new fabric.ActiveSelection(objs, { canvas: c }))
+    c.requestRenderAll()
+    get().pushHistory()
+  },
+
+  editSelectedWithAI() {
+    const c = get().canvas
+    if (!c) return
+    const active = c.getActiveObject()
+    if (!active || active.type !== 'image') return
+    const dataUrl = (active as fabric.FabricImage).toDataURL({ format: 'png', multiplier: 1 })
+    window.dispatchEvent(new CustomEvent('ads:edit-with-ai', { detail: { dataUrl } }))
+  },
+
+  pushHistory() {
+    const c = get().canvas
+    if (!c || get()._histLock) return
+    const json = JSON.stringify(c.toJSON())
+    const undo = get()._undo
+    if (undo[undo.length - 1] === json) return
+    const next = [...undo, json].slice(-50)
+    set({ _undo: next, _redo: [], canUndo: next.length > 1, canRedo: false })
+  },
+
+  undo() {
+    const c = get().canvas
+    if (!c) return
+    const undo = [...get()._undo]
+    if (undo.length < 2) return
+    const current = undo.pop()!
+    const prev = undo[undo.length - 1]
+    const redo = [...get()._redo, current]
+    set({ _histLock: true, _undo: undo, _redo: redo, canUndo: undo.length > 1, canRedo: true })
+    c.loadFromJSON(JSON.parse(prev)).then(() => {
+      c.requestRenderAll()
+      set({ _histLock: false })
+      get().refreshSelection()
+    })
+  },
+
+  redo() {
+    const c = get().canvas
+    if (!c) return
+    const redo = [...get()._redo]
+    const next = redo.pop()
+    if (!next) return
+    const undo = [...get()._undo, next]
+    set({ _histLock: true, _undo: undo, _redo: redo, canUndo: undo.length > 1, canRedo: redo.length > 0 })
+    c.loadFromJSON(JSON.parse(next)).then(() => {
+      c.requestRenderAll()
+      set({ _histLock: false })
+      get().refreshSelection()
+    })
   },
 
   zoomBy(factor) {
@@ -270,39 +588,73 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ zoom })
   },
 
+  zoomToSelection() {
+    const c = get().canvas
+    if (!c) return
+    const objs = c.getActiveObjects()
+    if (!objs.length) {
+      get().fitToContent()
+      return
+    }
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    objs.forEach((o) => {
+      const r = o.getBoundingRect()
+      minX = Math.min(minX, r.left)
+      minY = Math.min(minY, r.top)
+      maxX = Math.max(maxX, r.left + r.width)
+      maxY = Math.max(maxY, r.top + r.height)
+    })
+    const pad = 80
+    const cw = c.getWidth()
+    const ch = c.getHeight()
+    const zoom = Math.min(cw / (maxX - minX + pad * 2), ch / (maxY - minY + pad * 2), 3)
+    c.setViewportTransform([zoom, 0, 0, zoom, -minX * zoom + pad * zoom, -minY * zoom + pad * zoom])
+    set({ zoom })
+  },
+
   async exportSelected() {
     const c = get().canvas
     if (!c) return
+    const { exportFormat, exportQuality, exportScale } = get()
     const active = c.getActiveObject()
-    const target = active || c
-    const dataUrl = (target as any).toDataURL({ format: 'png', multiplier: 2 })
-    await api.exportImage(dataUrl, `设计图_${Date.now()}.png`)
+    const fmt: 'png' | 'jpeg' = exportFormat === 'jpeg' ? 'jpeg' : 'png'
+    const opts = { format: fmt, multiplier: exportScale, quality: exportQuality }
+    const dataUrl = active ? active.toDataURL(opts) : c.toDataURL(opts)
+    await api.exportImage(dataUrl, `设计图_${Date.now()}.${fmt === 'jpeg' ? 'jpg' : 'png'}`)
   },
 
   async exportLongFromSelection() {
     const c = get().canvas
     if (!c) return
+    const { exportFormat, exportQuality, exportScale, longImageGap } = get()
     const objects = c.getActiveObjects().length ? c.getActiveObjects() : c.getObjects()
     const images = objects.filter((o) => o.type === 'image')
     if (images.length === 0) return
-    // Stitch selected images vertically into a single long PNG.
+    // Stitch selected images vertically into a single long image (configurable gap + scale).
     images.sort((a, b) => (a.top || 0) - (b.top || 0))
-    const width = Math.max(...images.map((i) => i.getScaledWidth()))
-    const height = images.reduce((sum, i) => sum + i.getScaledHeight(), 0)
+    const s = exportScale
+    const gap = longImageGap * s
+    const width = Math.max(...images.map((i) => i.getScaledWidth())) * s
+    const height =
+      images.reduce((sum, i) => sum + i.getScaledHeight() * s, 0) + gap * (images.length - 1)
     const out = document.createElement('canvas')
-    out.width = width
-    out.height = height
+    out.width = Math.round(width)
+    out.height = Math.round(height)
     const ctx = out.getContext('2d')!
     ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, width, height)
+    ctx.fillRect(0, 0, out.width, out.height)
     let y = 0
     for (const obj of images) {
       const el = (obj as fabric.FabricImage).getElement() as HTMLImageElement
-      const w = obj.getScaledWidth()
-      const h = obj.getScaledHeight()
+      const w = obj.getScaledWidth() * s
+      const h = obj.getScaledHeight() * s
       ctx.drawImage(el, 0, y, w, h)
-      y += h
+      y += h + gap
     }
-    await api.exportLongImage(out.toDataURL('image/png'))
+    const fmt = exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png'
+    await api.exportLongImage(out.toDataURL(fmt, exportQuality))
   },
 }))

@@ -9,6 +9,7 @@ export default function Composer() {
   const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [showModels, setShowModels] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const textRef = useRef<HTMLTextAreaElement | null>(null)
   const params = useChatStore((s) => s.params)
   const setParams = useChatStore((s) => s.setParams)
   const send = useChatStore((s) => s.send)
@@ -17,6 +18,18 @@ export default function Composer() {
   useEffect(() => {
     api.getProviders().then(setProviders)
   }, [])
+
+  // Image-to-image: triggered from canvas right-click "用 AI 改这张图"
+  useEffect(() => {
+    const onEdit = (e: Event) => {
+      const detail = (e as CustomEvent<{ dataUrl: string }>).detail
+      if (!detail?.dataUrl) return
+      setParams({ referenceImage: detail.dataUrl, mode: 'image-to-image' })
+      textRef.current?.focus()
+    }
+    window.addEventListener('ads:edit-with-ai', onEdit)
+    return () => window.removeEventListener('ads:edit-with-ai', onEdit)
+  }, [setParams])
 
   const currentProvider = providers.find((p) => p.id === params.providerId)
   const currentModel = currentProvider?.models.find((m) => m.id === params.model)
@@ -151,6 +164,7 @@ export default function Composer() {
           onChange={(e) => onFile(e.target.files?.[0])}
         />
         <textarea
+          ref={textRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

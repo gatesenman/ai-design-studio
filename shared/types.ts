@@ -115,11 +115,53 @@ export interface BrandKit {
 
 // ---------------- Settings ----------------
 
+/** System-level preferences that tune default generation, canvas, and export behavior. */
+export interface AppPreferences {
+  /** Default provider/model/size/count used to seed the composer on launch. */
+  defaultProviderId: ProviderId
+  defaultModel: string
+  defaultSize: string
+  defaultCount: number
+  /** UI theme. */
+  theme: 'dark' | 'light'
+  /** Show the dotted background grid on the canvas. */
+  showGrid: boolean
+  /** Snap objects to other objects' edges/centers while dragging. */
+  snapEnabled: boolean
+  /** Canvas background color. */
+  canvasBg: string
+  /** Default export image format. */
+  exportFormat: 'png' | 'jpeg'
+  /** JPEG quality (0-1), ignored for PNG. */
+  exportQuality: number
+  /** Export resolution multiplier (1 / 2 / 4). */
+  exportScale: number
+  /** Gap in px between sections when stitching a long image (0 = seamless). */
+  longImageGap: number
+}
+
+export const DEFAULT_PREFERENCES: AppPreferences = {
+  defaultProviderId: 'siliconflow',
+  defaultModel: 'Kwai-Kolors/Kolors',
+  defaultSize: '1024x1024',
+  defaultCount: 4,
+  theme: 'dark',
+  showGrid: true,
+  snapEnabled: true,
+  canvasBg: '#1a1a1e',
+  exportFormat: 'png',
+  exportQuality: 0.92,
+  exportScale: 2,
+  longImageGap: 0,
+}
+
 export interface AppSettings {
   apiKeys: Record<string, string>
   /** Extra base URLs for providers that support custom endpoints (proxies). */
   baseUrls: Record<string, string>
   brandKit: BrandKit
+  /** System-level preferences (optional for backward compat with old settings files). */
+  preferences?: AppPreferences
 }
 
 // ---------------- IPC channel names ----------------

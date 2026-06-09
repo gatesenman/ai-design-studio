@@ -5,15 +5,30 @@ import CanvasBoard from '@/components/Canvas/CanvasBoard'
 import CanvasToolbar from '@/components/Canvas/CanvasToolbar'
 import SettingsModal from '@/components/Settings/SettingsModal'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useChatStore } from '@/stores/chatStore'
 
 export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [chatWidth, setChatWidth] = useState(380)
   const loadSettings = useSettingsStore((s) => s.load)
+  const prefs = useSettingsStore((s) => s.settings.preferences)
+  const loaded = useSettingsStore((s) => s.loaded)
 
   useEffect(() => {
     loadSettings()
   }, [loadSettings])
+
+  // Seed the composer with the user's default generation params + apply theme.
+  useEffect(() => {
+    if (!loaded || !prefs) return
+    useChatStore.getState().setParams({
+      providerId: prefs.defaultProviderId,
+      model: prefs.defaultModel,
+      size: prefs.defaultSize,
+      count: prefs.defaultCount,
+    })
+    document.documentElement.classList.toggle('light', prefs.theme === 'light')
+  }, [loaded, prefs])
 
   // Drag to resize the chat panel.
   const startDrag = (e: React.MouseEvent) => {
