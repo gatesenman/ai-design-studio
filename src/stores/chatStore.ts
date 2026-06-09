@@ -30,7 +30,11 @@ interface ChatState {
   params: GenParams
   setParams: (p: Partial<GenParams>) => void
   send: (prompt: string) => Promise<void>
-  runSkill: (skill: Skill, vars: Record<string, string>) => Promise<void>
+  runSkill: (
+    skill: Skill,
+    vars: Record<string, string>,
+    override?: { providerId: ProviderId; model: string },
+  ) => Promise<void>
   clear: () => void
 }
 
@@ -127,8 +131,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
   },
 
-  async runSkill(skill, vars) {
+  async runSkill(skill, vars, override) {
     if (get().busy) return
+    const providerId = override?.providerId ?? skill.defaultProviderId
+    const model = override?.model ?? skill.defaultModel
     const summary = `运行 Skill：${skill.name}`
     const isLong = !!skill.sections?.length
 
@@ -136,7 +142,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       `加载 Skill「${skill.name}」`,
       '解析变量与品牌约束…',
       isLong ? `规划 ${skill.sections!.length} 个分节，保持风格连贯…` : `准备批量生成 ${skill.count} 张…`,
-      `模型：${skill.defaultModel}（${skill.size}）`,
+      `模型：${model}（${skill.size}）`,
     ]
     const userMsg: ChatMessage = { id: nanoid(6), role: 'user', text: summary }
     const pendingMsg: ChatMessage = {
@@ -159,8 +165,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         for (const section of skill.sections!) {
           const sectionPrompt = `${base}。${fillTemplate(section.prompt, vars)}。保持与整体一致的风格、色调、光线与构图，画面上下可无缝衔接`
           const res = await api.generate({
-            providerId: skill.defaultProviderId,
-            model: skill.defaultModel,
+            providerId,
+            model,
             mode: 'text-to-image',
             prompt: applyBrandKit(sectionPrompt),
             size: skill.size,
@@ -189,8 +195,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }))
       } else {
         const res = await api.generate({
-          providerId: skill.defaultProviderId,
-          model: skill.defaultModel,
+          providerId,
+          model,
           mode: 'text-to-image',
           prompt: applyBrandKit(base),
           size: skill.size,
